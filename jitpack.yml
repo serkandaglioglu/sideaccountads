@@ -1,0 +1,9 @@
+# JitPack derleme ayarları. Varsayılan JDK 8'dir; AGP 9 en az JDK 17 ister, Gradle daemon'u da
+# gradle/gradle-daemon-jvm.properties'e göre JDK 21'de çalışır.
+jdk:
+  - openjdk21
+
+# Demo derlenmez; yalnızca kütüphane modülleri yayınlanır.
+# Her modül com.github.serkandaglioglu.sideaccountads:<modül>:<tag> olarak çıkar.
+install:
+  - ./gradlew :sideaccountads-core:publishToMavenLocal :sideaccountads-admob:publishToMavenLocal --no-daemon --stacktrace

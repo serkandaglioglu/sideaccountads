@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Core, mediator'ı bu değerden bulur. Her mediator modülü aynı anahtarı kendi sınıfıyla tanımlar;
+             iki mediator modülü birlikte eklenirse manifest birleştirme hatası verir (bir uygulamada tek mediator). -->
+        <meta-data
+            android:name="com.sideaccountapps.ads.MEDIATOR"
+            android:value="com.sideaccountapps.ads.admob.AdMobMediator" />
+    </application>
+</manifest>
