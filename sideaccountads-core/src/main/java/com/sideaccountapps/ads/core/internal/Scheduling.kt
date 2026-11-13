@@ -11,9 +11,9 @@ import kotlin.math.min
 /** Bağlantıyı izler; bağlantı yokken bekletilen işleri bağlantı gelince çalıştırır. */
 internal object OnlineWatcher {
 
+    /** Setter testler için açık. */
     @Volatile
     var isOnline = true
-        private set
 
     private var started = false
     private val waiting = LinkedHashMap<String, () -> Unit>()

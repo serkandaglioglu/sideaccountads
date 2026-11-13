@@ -65,6 +65,12 @@
                 android:text="Banner: MREC 300x250" />
 
             <Button
+                android:id="@+id/btnBannerToggle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="banner_adaptive: ayarla kapat / aç" />
+
+            <Button
                 android:id="@+id/btnDebugger"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -72,8 +78,20 @@
         </LinearLayout>
     </ScrollView>
 
+    <!-- Kenar boşluklu kart: ADAPTIVE banner ekranın değil container'ın genişliğinde istenir.
+         Reklam gelene kadar INVISIBLE (GONE'da ölçülmez, pencere genişliği kullanılır). -->
     <FrameLayout
-        android:id="@+id/bannerContainer"
+        android:id="@+id/bannerCard"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:background="#FFE8EAF6"
+        android:padding="8dp"
+        android:visibility="invisible">
+
+        <FrameLayout
+            android:id="@+id/bannerContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </FrameLayout>
 </LinearLayout>

@@ -165,6 +165,14 @@ class InterstitialAds internal constructor() {
     @JvmOverloads
     fun load(placementId: String? = null) = Engine.load(AdType.INTERSTITIAL, placementId)
 
+    /**
+     * Yükler ve sonucu yalnızca [callbacks]'e bir kez bildirir; genel [SideAds.listener]'a dokunmak gerekmez (ör.
+     * splash). Reklam zaten yüklüyse onLoaded hemen gelir; yükleme sürüyorsa onun sonucu beklenir. Placement
+     * kapalıysa, bağlantı yoksa ya da SDK consent yüzünden başlamadıysa onLoadFailed hemen gelir (son ikisinde yükleme
+     * yine kuyruğa girer). Kütüphanede yükleme zaman aşımı yoktur; ne kadar bekleneceğine uygulama karar verir.
+     */
+    fun load(placementId: String?, callbacks: LoadCallbacks) = Engine.load(AdType.INTERSTITIAL, placementId, callbacks)
+
     /** Gösterilebilir (yüklü ve süresi dolmamış) reklam var mı? */
     @JvmOverloads
     fun isReady(placementId: String? = null): Boolean = Engine.isReady(AdType.INTERSTITIAL, placementId)
@@ -189,6 +197,9 @@ class RewardedAds internal constructor() {
     /** Yüklemeyi başlatır (preload açıksa genellikle gerekmez). */
     @JvmOverloads
     fun load(placementId: String? = null) = Engine.load(AdType.REWARDED, placementId)
+
+    /** Yükler, sonucu yalnızca [callbacks]'e bir kez bildirir; kurallar [InterstitialAds.load] ile aynı. */
+    fun load(placementId: String?, callbacks: LoadCallbacks) = Engine.load(AdType.REWARDED, placementId, callbacks)
 
     /** Gösterilebilir reklam var mı? */
     @JvmOverloads
@@ -218,6 +229,9 @@ class AppOpenAds internal constructor() {
     /** Yüklemeyi başlatır (preload açıksa genellikle gerekmez). */
     @JvmOverloads
     fun load(placementId: String? = null) = Engine.load(AdType.APP_OPEN, placementId)
+
+    /** Yükler, sonucu yalnızca [callbacks]'e bir kez bildirir; kurallar [InterstitialAds.load] ile aynı. */
+    fun load(placementId: String?, callbacks: LoadCallbacks) = Engine.load(AdType.APP_OPEN, placementId, callbacks)
 
     /** Gösterilebilir reklam var mı? */
     @JvmOverloads
@@ -260,6 +274,10 @@ class BannerAds internal constructor() {
      * Banner'ı yükleyip [container]'a yerleştirir. Aynı activity + placement + boyut için canlı bir banner varsa yeni
      * istek atılmaz, mevcut banner taşınır. Boyut değiştiyse eskisi destroy edilip yenisi yüklenir.
      *
+     * ADAPTIVE genişliği [container]'ın (padding hariç) genişliğidir: container henüz layout olmadıysa yükleme ilk
+     * layout'u bekler; GONE ise pencere genişliği kullanılır. Banner daha dar bir container'a taşınırsa yeni
+     * genişlikle yeniden yüklenir.
+     *
      * @return banner'ı yönetmek için slot; ayar/placement kapalıysa null.
      */
     @JvmOverloads
@@ -268,7 +286,20 @@ class BannerAds internal constructor() {
         container: ViewGroup,
         size: BannerSize = BannerSize.ADAPTIVE,
         placementId: String? = null
-    ): BannerSlot? = BannerFlow.show(activity, container, size, placementId)
+    ): BannerSlot? = BannerFlow.show(activity, container, size, placementId, null)
+
+    /**
+     * [show] gibi; ayrıca bu banner'ın olayları [callbacks]'e gelir (ör. kartı reklam gelince göstermek, banner
+     * kaldırılınca gizlemek). Cache'teki banner tekrar gösterilirse olaylar son verilen callback'lere gider ve reklam
+     * zaten yüklüyse onLoaded hemen çağrılır. null dönerse callback çağrılmaz.
+     */
+    fun show(
+        activity: Activity,
+        container: ViewGroup,
+        size: BannerSize = BannerSize.ADAPTIVE,
+        placementId: String? = null,
+        callbacks: BannerCallbacks
+    ): BannerSlot? = BannerFlow.show(activity, container, size, placementId, callbacks)
 
     /** [placementId] null ise tüm banner'ları, değilse o placement'ınkileri destroy eder. */
     @JvmOverloads
@@ -285,6 +316,15 @@ class ConsentFlow internal constructor() {
      */
     @JvmOverloads
     fun request(activity: Activity, callback: ConsentCallback? = null) = Engine.requestConsent(activity, callback)
+
+    /**
+     * Reklam istenebilir mi (UMP)? Değer ancak bu süreçte [request] çağrıldıktan sonra güvenilirdir: UMP kayıtlı
+     * consent'i bile o çağrıdan önce bildirmez (`false` döner). [request] döner dönmez önceki oturumun consent'ini
+     * yansıtır; ör. splash'te form ve ağ isteği beklenmeden devam etmek ya da consent yokken banner istememek için.
+     * `umpConsentEnabled = false` ise (consent'i kütüphane yönetmiyor) [request] gibi her zaman `true`.
+     */
+    fun canRequestAds(context: Context): Boolean =
+        Engine.settings?.umpConsentEnabled == false || UmpConsent.canRequestAds(context)
 
     /** Ayarlar ekranında "gizlilik seçenekleri" girişi gösterilmeli mi? */
     fun requiresPrivacyOptions(context: Context): Boolean = UmpConsent.requiresPrivacyOptions(context)

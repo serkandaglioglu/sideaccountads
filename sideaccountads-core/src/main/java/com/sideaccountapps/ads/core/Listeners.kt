@@ -47,6 +47,35 @@ interface ShowCallbacks {
     fun onShowFailed(error: String) {}
 }
 
+/**
+ * Tek bir yükleme isteğinin sonucu (ör. `SideAds.interstitial.load(placementId, callbacks)`); genel
+ * [SideAdsListener]'a ek olarak çağrılır ve onu değiştirmeyi gerektirmez. Tam olarak bir kez [onLoaded] ya da
+ * [onLoadFailed] gelir. Her metot isteğe bağlıdır, main thread'de çağrılır.
+ */
+interface LoadCallbacks {
+    /** Reklam yüklendi (ya da zaten yüklüydü); gösterilebilir. */
+    fun onLoaded() {}
+
+    /** Reklam yüklenemedi; [error] nedeni içerir. */
+    fun onLoadFailed(error: String) {}
+}
+
+/**
+ * Tek bir banner'ın olayları (`SideAds.banner.show(…, callbacks)`); genel [SideAdsListener]'a ek olarak çağrılır.
+ * Örn. container'ı saran kartı reklam gelince göstermek, banner kaldırılınca gizlemek. Her metot isteğe bağlıdır,
+ * main thread'de çağrılır.
+ */
+interface BannerCallbacks {
+    /** Reklam yüklendi (otomatik yenilemeler dahil); container dolu. */
+    fun onLoaded() {}
+
+    /** Tüm ad unit'ler hata verdi; retry sürebilir. */
+    fun onLoadFailed(error: String) {}
+
+    /** Banner kaldırıldı ve container boşaldı; bu banner bir daha olay üretmez. */
+    fun onRemoved(reason: BannerRemovalReason) {}
+}
+
 /** Rewarded ödülü. Main thread'de çağrılır. */
 fun interface RewardCallback {
     /** Kullanıcı ödülü kazandı. */

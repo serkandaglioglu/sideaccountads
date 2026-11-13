@@ -161,6 +161,14 @@ class SideAdsSettings private constructor(
     /** Global anahtar ve format açık mı? */
     fun isFormatEnabled(type: AdType): Boolean = adsEnabled && formats[type]?.enabled == true
 
+    /**
+     * Placement kullanılabilir mi: global anahtar ve format açık, placement tanımlı ve açık. [placementId] null ise
+     * formatın default placement'ı.
+     */
+    @JvmOverloads
+    fun isPlacementEnabled(type: AdType, placementId: String? = null): Boolean =
+        isFormatEnabled(type) && formats[type]?.placement(placementId)?.enabled == true
+
     /** Bu ayarlarla doldurulmuş yeni bir builder; birkaç alanı değiştirip yeni ayar üretmek için. */
     fun newBuilder(): Builder = Builder().also { it.seedFrom(this) }
 

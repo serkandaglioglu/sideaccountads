@@ -13,11 +13,23 @@ enum class BannerSize {
     /** Sabit 320x50. */
     STANDARD,
 
-    /** Ekran genişliğine uyan anchored adaptive banner (önerilen). */
+    /** Container genişliğine uyan anchored adaptive banner (önerilen). */
     ADAPTIVE,
 
     /** 300x250 medium rectangle. */
     MREC
+}
+
+/** Banner'ın neden kaldırıldığı; bkz. [BannerCallbacks.onRemoved]. */
+enum class BannerRemovalReason {
+    /** Ayar güncellemesi formatı ya da placement'ı kapattı. */
+    DISABLED_BY_SETTINGS,
+
+    /** `destroy()` çağrıldı (slot'ta ya da `SideAds.banner`'da) ya da aynı placement başka boyutla gösterildi. */
+    DESTROYED,
+
+    /** Banner'ın activity'si destroy oldu. */
+    ACTIVITY_DESTROYED
 }
 
 /**

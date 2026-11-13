@@ -12,6 +12,7 @@ import com.sideaccountapps.ads.core.AdDetails
 import com.sideaccountapps.ads.core.AdType
 import com.sideaccountapps.ads.core.ConsentCallback
 import com.sideaccountapps.ads.core.FormatSettings
+import com.sideaccountapps.ads.core.LoadCallbacks
 import com.sideaccountapps.ads.core.PlacementSettings
 import com.sideaccountapps.ads.core.RevenueEvent
 import com.sideaccountapps.ads.core.Reward
@@ -37,8 +38,8 @@ internal object Engine {
     /** JSON ile başlatmada verilen, her JSON güncellemesinde yeniden uygulanan blok. */
     var localSettings: (SideAdsSettings.Builder.() -> Unit)? = null
 
+    /** Setter testler için açık (sahte mediator). */
     var mediator: AdMediator? = null
-        private set
 
     val gate = InitGate(Main.timer)
     val chain = AdUnitChain(Main.timer)
@@ -53,6 +54,9 @@ internal object Engine {
 
     private val ads = HashMap<String, StoredAd>()
     private val loading = HashSet<String>()
+
+    /** Tek seferlik yükleme callback'leri; anahtarın bir sonraki yükleme sonucunda bir kez çağrılır. */
+    private val waiters = HashMap<String, MutableList<LoadCallbacks>>()
 
     fun key(type: AdType, placementId: String) = "${type.name}/$placementId"
 
@@ -212,6 +216,38 @@ internal object Engine {
         Main.run { startLoad(type, p.id) }
     }
 
+    /**
+     * Yükler ve sonucu [callbacks]'e bir kez bildirir. Geçerli reklam varsa hemen onLoaded. Sonucun ne zaman geleceği
+     * belli değilse (bağlantı yok, SDK consent yüzünden başlamadı) hemen onLoadFailed; yükleme yine kuyruğa girer.
+     * Böylece callback (ve tuttuğu activity) süresiz bekletilmez.
+     */
+    fun load(type: AdType, placementId: String?, callbacks: LoadCallbacks) =
+        Main.run { loadFor(type, placementId, callbacks) }
+
+    private fun loadFor(type: AdType, placementId: String?, callbacks: LoadCallbacks) {
+        val s = settings ?: run {
+            Logger.e("load called before SideAds.init")
+            return callbacks.onLoadFailed("SideAds.init has not been called")
+        }
+        val (fs, p) = resolve(s, type, placementId)
+            ?: return callbacks.onLoadFailed("$type placement '${placementId ?: "default"}' is disabled or not configured")
+        if (validAd(type, fs, p) != null) return callbacks.onLoaded()
+        val key = key(type, p.id)
+        // Sonuç senkron gelebilir: callback yüklemeden önce kaydedilir.
+        waiters.getOrPut(key) { ArrayList() } += callbacks
+        startLoad(type, p.id)
+        val blocker = when {
+            !OnlineWatcher.isOnline -> "offline; the load starts when the connection returns"
+            !sdkStarted -> "the ad SDK has not started (UMP consent not confirmed)"
+            else -> return
+        }
+        if (waiters[key]?.remove(callbacks) == true) callbacks.onLoadFailed(blocker)
+    }
+
+    private fun answerWaiters(key: String, error: String?) {
+        waiters.remove(key)?.forEach { if (error == null) it.onLoaded() else it.onLoadFailed(error) }
+    }
+
     private fun startLoad(type: AdType, placementId: String) {
         val s = settings ?: return
         val (fs, p) = resolve(s, type, placementId) ?: return
@@ -227,6 +263,7 @@ internal object Engine {
         }
         val m = mediator ?: run {
             Dispatch.event { it.onLoadFailed(type, p.id, "no mediator module") }
+            answerWaiters(key, "no mediator module")
             return
         }
         if (!OnlineWatcher.isOnline) {
@@ -256,11 +293,13 @@ internal object Engine {
                 val details = AdDetails(type, placementId, result.adUnitId, result.value.adSourceName)
                 Logger.i("Loaded $key from ${result.adUnitId} (source: ${details.adSourceName})")
                 Dispatch.event { it.onLoaded(details) }
+                answerWaiters(key, null)
             }
 
             is ChainResult.Failed -> {
                 Logger.w("All ad units failed for $key: ${result.error}")
                 Dispatch.event { it.onLoadFailed(type, placementId, result.error) }
+                answerWaiters(key, result.error)
                 // Tek kullanımlık (reloadAfterShow=false) ve otomatik preload dışı placement'larda retry yok.
                 val s = settings ?: return
                 val fs = s.format(type) ?: return

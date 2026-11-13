@@ -143,6 +143,12 @@ SideAds.consent.request(this) { canRequestAds ->
 }
 ```
 
+`SideAds.consent.canRequestAds(context)` consent'in reklam istemeye izin verip vermediğini söyler. Değer ancak bu
+süreçte `request()` çağrıldıktan sonra güvenilirdir: UMP kayıtlı consent'i bile o çağrıdan önce bildirmez (`false`
+döner); `request()` döner dönmez önceki oturumun consent'ini yansıtır. Splash'te callback'i beklemeden devam etmek
+(bkz. splash örneği) ya da consent yokken banner'ı hiç istememek için kullanılır. `umpConsentEnabled = false` ise
+her zaman `true`.
+
 Ayarlar ekranı için: `SideAds.consent.requiresPrivacyOptions(context)` ve
 `SideAds.consent.showPrivacyOptions(activity)`. Test için: `SideAds.consent.resetForTesting(context)`.
 `testMode` açık ve `admobTestDeviceIds` verilmişse EEA debug coğrafyası uygulanır (form AB dışında da görünür).
@@ -221,6 +227,10 @@ kalıcı olması gerekenleri `localSettings`'te verin. Aynı şey `SideAds.setti
 Gösterim çağrıları main thread'den yapılır. `show` gösterim başladıysa `true` döner; reklam hazır değilse
 `false` döner ve yükleme tetikler. Placement verilmezse format'ın default placement'ı kullanılır.
 
+Bir placement'ın kullanılabilir olup olmadığı (ör. butonu gizlemek için):
+`SideAds.settings?.isPlacementEnabled(AdType.REWARDED, "rewarded_default") == true`. `adsEnabled`, format ve
+placement açık olmalı; placement verilmezse default placement'a bakılır.
+
 ### Interstitial
 
 ```kotlin
@@ -230,6 +240,25 @@ SideAds.interstitial.show(activity)                    // frekans kurallarıyla
 SideAds.interstitial.show(activity, "inter_gameover")
 SideAds.interstitial.showIgnoringTimeRules(activity)   // en kısa aralık ve ilk gecikme atlanır
 ```
+
+### Tek seferlik yükleme sonucu
+
+`load(placementId, callbacks)` (interstitial, rewarded, app open) sonucu yalnızca o çağrıya bir kez bildirir;
+global listener'ı değiştirmek gerekmez:
+
+```kotlin
+SideAds.interstitial.load("inter_level_end", object : LoadCallbacks {
+    override fun onLoaded() { SideAds.interstitial.show(activity, "inter_level_end") }
+    override fun onLoadFailed(error: String) { /* devam et */ }
+})
+```
+
+- Reklam zaten yüklüyse `onLoaded` hemen gelir; yükleme sürüyorsa onun sonucu beklenir (bekleyen her çağrı sonucu
+  bir kez alır). `SideAds.listener` olayları her zamanki gibi alır.
+- Placement kapalıysa ya da tanımsızsa, bağlantı yoksa ya da SDK consent yüzünden başlamadıysa `onLoadFailed` hemen
+  gelir. Son ikisinde yükleme yine kuyruğa girer, bağlantı ya da consent gelince yapılır; callback ise (ve tuttuğu
+  activity) süresiz bekletilmez.
+- Kütüphanede yükleme zaman aşımı yoktur; ne kadar bekleneceğine uygulama karar verir (bkz. splash örneği).
 
 ### Rewarded
 
@@ -262,7 +291,11 @@ val slot = SideAds.banner.show(
     activity = this,
     container = findViewById(R.id.bannerContainer),
     size = BannerSize.ADAPTIVE,        // STANDARD | ADAPTIVE | MREC
-    placementId = null                 // null = default placement
+    placementId = null,                // null = default placement
+    callbacks = object : BannerCallbacks {      // isteğe bağlı
+        override fun onLoaded() { bannerCard.visibility = View.VISIBLE }
+        override fun onRemoved(reason: BannerRemovalReason) { bannerCard.visibility = View.INVISIBLE }
+    }
 )
 // Activity bir LifecycleOwner ise (ComponentActivity/AppCompatActivity) pause/resume/destroy otomatik.
 // Değilse: slot?.pause() / slot?.resume() / slot?.destroy()
@@ -270,6 +303,24 @@ val slot = SideAds.banner.show(
 SideAds.banner.destroy()               // tüm banner'lar
 SideAds.banner.destroy("banner_default")
 ```
+
+- **Callback'ler** (`BannerCallbacks`, hepsi isteğe bağlı): `onLoaded` (otomatik yenilemeler dahil),
+  `onLoadFailed` (tüm ad unit'ler hata verdi; retry sürebilir) ve `onRemoved(reason)`: banner kaldırıldı,
+  container boşaldı. Nedenler: `DISABLED_BY_SETTINGS` (ayar güncellemesi formatı ya da placement'ı kapattı),
+  `DESTROYED` (`destroy()` çağrıldı ya da aynı placement başka boyutla gösterildi), `ACTIVITY_DESTROYED`. Cache'teki
+  banner tekrar gösterilirse olaylar son `show`'un callback'lerine gider ve reklam zaten yüklüyse `onLoaded` hemen
+  gelir. `show` null dönerse (ayar kapalı) callback çağrılmaz.
+- **ADAPTIVE genişliği** ekranın değil container'ın (padding hariç) genişliğidir; kenar boşluklu kartta ya da
+  bottom sheet'te reklam taşıp kırpılmaz. `show` container layout olmadan (ör. `onCreate`'te) çağrılırsa yükleme
+  ilk layout'u bekler. Container `GONE` ise hiç layout olmaz: pencere genişliği kullanılır, container görünür olup
+  daha dar çıkarsa reklam yeni genişlikle yeniden yüklenir (ikinci istek). Banner'ı gelene kadar gizlemek için
+  `GONE` yerine `INVISIBLE` kullanın; `INVISIBLE` container ölçülür.
+- **Başka container'a taşıma:** Cache'teki banner yeni container'a taşınınca yeni istek atılmaz. Yeni container
+  daha darsa (ya da container daralırsa, ör. paylaşılan modda yatay → dikey) reklam kırpılmasın diye bırakılır ve
+  yeni genişlikle yeniden yüklenir; daha genişse reklam ortalanmış kalır.
+- `STANDARD` (320x50) ve `MREC` (300x250) sabit boyutludur; container'ın onlara yetecek genişlikte olması gerekir.
+- Consent yokken SDK başlamaz ve banner gelmez; boşuna istememek için `show`'dan önce
+  `SideAds.consent.canRequestAds(this)` kontrol edilebilir.
 
 ### Ayıklama (debug) ekranı
 
@@ -315,43 +366,37 @@ SideAds.interstitial.show(activity, "inter_gameover", object : ShowCallbacks {
 
 ### Süre sınırlı splash örneği
 
-Splash'te en fazla ne kadar bekleneceğine uygulama karar verir. Kütüphanede yükleme zaman aşımı yoktur;
-`onLoaded` / `onLoadFailed` ile ve kendi zamanlayıcınızla beklenir:
+Splash'te en fazla ne kadar bekleneceğine uygulama karar verir. Kütüphanede yükleme zaman aşımı yoktur; tek
+seferlik `load(placementId, callbacks)` ve kendi zamanlayıcınızla beklenir, global listener'a dokunulmaz. `demo`
+modülündeki `SplashActivity` bu örneğin kendisidir.
 
 ```kotlin
 class SplashActivity : ComponentActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private var appListener: SideAdsListener? = null
+    private var waiting = false
     private var done = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SideAds.consent.request(this) { waitForAd() }
+        // Kayıtlı consent request() döner dönmez bilinir: ağ isteğini ve formu beklemeden devam et.
+        if (SideAds.consent.canRequestAds(this)) waitForAd()
     }
 
     private fun waitForAd() {
-        if (SideAds.interstitial.isReady(SPLASH)) return showAdThenContinue()
-        // Splash süresince yükleme olaylarını dinle; uygulamanın kendi listener'ına da ilet.
-        appListener = SideAds.listener
-        SideAds.listener = object : SideAdsListener {
-            override fun onLoaded(ad: AdDetails) {
-                appListener?.onLoaded(ad)
-                if (ad.type == AdType.INTERSTITIAL && ad.placementId == SPLASH) showAdThenContinue()
-            }
-
-            override fun onLoadFailed(type: AdType, placementId: String, error: String) {
-                appListener?.onLoadFailed(type, placementId, error)
-                if (type == AdType.INTERSTITIAL && placementId == SPLASH) continueToMain()
-            }
-        }
-        SideAds.interstitial.load(SPLASH)              // preload kapalıysa
+        if (waiting || done) return
+        waiting = true
         handler.postDelayed(::continueToMain, 5_000)   // en fazla 5 sn
+        // Zaten yüklüyse onLoaded hemen; yüklenemiyorsa (bağlantı yok, consent yok, placement kapalı) onLoadFailed hemen.
+        SideAds.interstitial.load(SPLASH, object : LoadCallbacks {
+            override fun onLoaded() = showAdThenContinue()
+            override fun onLoadFailed(error: String) = continueToMain()
+        })
     }
 
     private fun showAdThenContinue() {
         if (done) return
-        restoreListener()
         val shown = SideAds.interstitial.showIgnoringTimeRules(this, SPLASH, object : ShowCallbacks {
             override fun onDismissed() = continueToMain()
             override fun onShowFailed(error: String) = continueToMain()
@@ -362,14 +407,16 @@ class SplashActivity : ComponentActivity() {
     private fun continueToMain() {
         if (done) return
         done = true
-        restoreListener()
         handler.removeCallbacksAndMessages(null)
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
 
-    private fun restoreListener() {
-        if (SideAds.listener !== appListener) SideAds.listener = appListener
+    override fun onDestroy() {
+        // Kullanıcı splash'ten geri çıktıysa geç gelen sonuç ana ekranı açmasın.
+        done = true
+        handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
     }
 
     private companion object {
@@ -379,7 +426,8 @@ class SplashActivity : ComponentActivity() {
 ```
 
 Splash placement'ını `reloadAfterShow = false` ile tanımlayın (tek kullanımlık; boşa istek atılmaz) ve
-`excludedActivities`'e ekleyerek app open'ın splash'te otomatik açılmasını önleyin.
+`excludedActivities`'e ekleyerek app open'ın splash'te otomatik açılmasını önleyin. Consent formu gerekiyorsa
+5 sn'lik süre form kapandıktan sonra başlar.
 
 ---
 
@@ -416,9 +464,11 @@ Splash placement'ını `reloadAfterShow = false` ile tanımlayın (tek kullanım
   (`NEW_TASK | RESET_TASK_IF_NEEDED`) kullanmak sorunu baştan önler.
 - **Banner:** Reklam kütüphanenin yarattığı kalıcı bir host view'a yüklenir; cache (activity, placement)
   bazlıdır. Aynı placement aynı boyutla tekrar istenirse yeni istek atılmaz, host yeni container'a taşınır; boyut
-  değişirse eskisi destroy edilip yenisi yüklenir. Host window'dan ayrılınca ya da activity pause'da otomatik
-  yenileme durur, geri gelince devam eder. Activity destroy olunca banner'ları temizlenir; ayarlarla kapatılan
-  banner'lar destroy edilir.
+  değişirse eskisi destroy edilip yenisi yüklenir. ADAPTIVE genişliği container'ınkidir (layout beklenir; `GONE`'da
+  pencere genişliği); daha dar bir container'a taşınan ADAPTIVE banner yeni genişlikle yeniden yüklenir. Host
+  window'dan ayrılınca ya da activity pause'da otomatik yenileme durur, geri gelince devam eder. Activity destroy
+  olunca banner'ları temizlenir; ayarlarla kapatılan banner'lar destroy edilir. Kaldırılan banner'ın nedeni
+  `BannerCallbacks.onRemoved`'a gider.
 - **Init:** İstekler SDK init'i bitene kadar kuyrukta bekler (en fazla 20 sn, sonra uyarıyla devam).
 - **Context:** Fullscreen yüklemelerinde öndeki activity kullanılır (Unity ve DT Exchange interstitial'ı Activity
   context olmadan yüklemiyor); banner view'ı activity ile yaratılır.
@@ -530,6 +580,11 @@ Logcat'te görülenler:
   (`… did not finish within 20s; running waiting requests anyway`) ve ardından `… init finished after the timeout` görülür.
 - Her placement için `Loaded … from …`. `inter_chain` placement'ının ilk ad unit'i bilerek geçersizdir: hata verip
   (`… failed (step 1/2): [3] …`) ikinci ad unit'e geçtiği görülür.
+- Açılışta `SplashActivity` (yukarıdaki splash örneği) consent'i ister, `inter_splash`'i en fazla 5 sn bekler,
+  gösterir ve ana ekrana geçer.
+- Ana ekranda adaptive banner kenar boşluklu bir kartta açılır; istenen genişlik logdadır (411dp'lik emülatörde
+  `Loading banner 'banner_adaptive' from … (step 1/1, 363dp wide)`). "banner_adaptive: ayarla kapat / aç" butonu
+  placement'ı `editSettings` ile kapatır: banner destroy edilir, kart `onRemoved(DISABLED_BY_SETTINGS)` ile gizlenir.
 - Butonlarla her format, banner boyutları ve Ad Inspector denenebilir; gösterim, kapanma, gelir ve ödül olayları
   `Demo` tag'iyle loglanır.
 

@@ -10,6 +10,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.sideaccountapps.ads.core.internal.Backoff
+import com.sideaccountapps.ads.core.internal.BannerFlow
 import com.sideaccountapps.ads.core.internal.BannerSlots
 import com.sideaccountapps.ads.core.internal.Logger
 import com.sideaccountapps.ads.core.mediation.MediatedBanner
@@ -40,6 +41,12 @@ class BannerSlot internal constructor(
     /** Yükleme zinciri ya da planlı bir retry sürüyor mu? */
     internal var loading = false
 
+    /** Son `show` çağrısında verilen callback'ler. */
+    internal var callbacks: BannerCallbacks? = null
+
+    /** ADAPTIVE reklamın istendiği genişlik (px); host bundan darsa reklam yeni genişlikle yeniden yüklenir. */
+    internal var requestedWidthPx = 0
+
     var isDestroyed = false
         private set
 
@@ -59,7 +66,7 @@ class BannerSlot internal constructor(
             owner.lifecycle.removeObserver(this)
             if (this@BannerSlot.owner === owner) this@BannerSlot.owner = null
             // Paylaşılan modda slot yaşar; yalnızca ölen activity'nin view ağacından çıkar.
-            if (destroyWithOwner) destroy() else detachFromParent()
+            if (destroyWithOwner) destroy(BannerRemovalReason.ACTIVITY_DESTROYED) else detachFromParent()
         }
     }
 
@@ -72,6 +79,7 @@ class BannerSlot internal constructor(
 
             override fun onViewDetachedFromWindow(v: View) = pause()
         })
+        host.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> BannerFlow.onHostLaidOut(this) }
     }
 
     /** Otomatik yenilemeyi durdurur. */
@@ -90,7 +98,9 @@ class BannerSlot internal constructor(
     }
 
     /** Banner'ı ve bekleyen isteği bırakır, host'u container'ından çıkarır. */
-    fun destroy() {
+    fun destroy() = destroy(BannerRemovalReason.DESTROYED)
+
+    internal fun destroy(reason: BannerRemovalReason) {
         if (isDestroyed) return
         isDestroyed = true
         loading = false
@@ -104,6 +114,16 @@ class BannerSlot internal constructor(
         host.removeAllViews()
         detachFromParent()
         BannerSlots.onSlotDestroyed(this)
+        Logger.d("Banner '$placementId' removed ($reason)")
+        val removed = callbacks
+        callbacks = null
+        removed?.onRemoved(reason)
+    }
+
+    /** Gösterilen reklamı bırakır; slot yaşar (ör. yeni genişlikle yeniden yüklenecek). */
+    internal fun dropCurrent() {
+        current?.destroy()
+        current = null
     }
 
     internal fun bindTo(owner: LifecycleOwner, destroyWithOwner: Boolean) {

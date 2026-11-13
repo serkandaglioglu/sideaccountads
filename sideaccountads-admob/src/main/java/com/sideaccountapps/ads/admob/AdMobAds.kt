@@ -24,6 +24,7 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions
 import com.sideaccountapps.ads.core.AdType
 import com.sideaccountapps.ads.core.BannerSize
+import com.sideaccountapps.ads.core.mediation.AdaptiveBannerWidth
 import com.sideaccountapps.ads.core.mediation.BannerEvents
 import com.sideaccountapps.ads.core.mediation.FullscreenEvents
 import com.sideaccountapps.ads.core.mediation.FullscreenLoadListener
@@ -61,7 +62,7 @@ internal object AdMobAds {
         // Bazı adaptörler banner için Activity context istiyor; core uygun context'i verir.
         val adView = AdView(context)
         adView.adUnitId = adUnitId
-        adView.setAdSize(adSize(context, size))
+        adView.setAdSize(adSize(context, host, size))
         adView.onPaidEventListener = OnPaidEventListener { value ->
             events.onPaid(value.valueMicros / 1_000_000.0, value.currencyCode, precision(value), sourceName(adView.responseInfo))
         }
@@ -92,14 +93,14 @@ internal object AdMobAds {
         }
     }
 
-    private fun adSize(context: Context, size: BannerSize): AdSize = when (size) {
+    private fun adSize(context: Context, host: ViewGroup, size: BannerSize): AdSize = when (size) {
         BannerSize.STANDARD -> AdSize.BANNER
         BannerSize.MREC -> AdSize.MEDIUM_RECTANGLE
-        BannerSize.ADAPTIVE -> {
-            val metrics = context.resources.displayMetrics
-            // 25.0'dan beri önerilen anchored adaptive boyut (eski anchored metotlar deprecated).
-            AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, (metrics.widthPixels / metrics.density).toInt())
-        }
+        // Ekranın değil container'ın genişliği: kenar boşluklu kartta reklam taşıp kırpılmasın.
+        // 25.0'dan beri önerilen anchored adaptive boyut (eski anchored metotlar deprecated).
+        BannerSize.ADAPTIVE -> AdSize.getLargeAnchoredAdaptiveBannerAdSize(
+            context, (AdaptiveBannerWidth.px(host) / context.resources.displayMetrics.density).toInt()
+        )
     }
 
     /** Hatanın kodu ve mesajı sonuca gider; her ağın hatası ve gecikmesi debug loglanır. */

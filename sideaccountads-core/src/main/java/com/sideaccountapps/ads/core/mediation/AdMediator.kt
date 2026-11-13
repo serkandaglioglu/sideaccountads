@@ -50,6 +50,9 @@ interface AdMediator {
      * Banner view'ını yaratır, [host]'a görünmez (INVISIBLE) ekler ve yüklemeyi başlatır; handle'ı hemen döner.
      * Her yükleme sonucu (ilki ve otomatik yenilemeler) [events]'e bildirilir. Core, ilk sonucu hata olan ya da
      * cevapsız kalan handle'ı [MediatedBanner.destroy] ile bırakır.
+     *
+     * [host] container'da MATCH_PARENT'tır. ADAPTIVE'de genişlik [AdaptiveBannerWidth.px] ile alınır; core bu
+     * çağrıyı host layout olduktan sonra yapar ve daha dar bir host'a taşınan banner'ı aynı kuralla yeniden yükler.
      */
     fun loadBanner(
         context: Context,
@@ -150,6 +153,19 @@ interface BannerEvents {
 
     /** Gösterim geliri. */
     fun onPaid(value: Double, currencyCode: String, precision: String, adSourceName: String?)
+}
+
+/** ADAPTIVE banner genişliği: mediator'lar ve core aynı kuralı kullanır. */
+object AdaptiveBannerWidth {
+    /**
+     * [host]'un içerik (padding hariç) genişliği, px. Host hiç layout olmadıysa (ör. GONE container) pencere
+     * genişliği.
+     */
+    @JvmStatic
+    fun px(host: ViewGroup): Int {
+        val width = host.width - host.paddingLeft - host.paddingRight
+        return if (host.isLaidOut && width > 0) width else host.resources.displayMetrics.widthPixels
+    }
 }
 
 /** Rewarded server-side verification parametreleri. */

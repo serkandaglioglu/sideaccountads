@@ -75,7 +75,8 @@ class DemoApp : Application() {
                 enabled = true                   // (varsayılan: true)
                 preload = true                   // açılışta ve gösterim sonrası otomatik yükleme (varsayılan: false)
                 defaultPlacement = "inter_default"                          // (varsayılan: ilk eklenen)
-                initialPreloadPlacements = listOf("inter_default", "inter_chain") // (varsayılan: boş = yalnızca default)
+                // (varsayılan: boş = yalnızca default)
+                initialPreloadPlacements = listOf("inter_default", "inter_chain", "inter_splash")
 
                 addPlacement(
                     id = "inter_default",
@@ -89,6 +90,8 @@ class DemoApp : Application() {
                 addPlacement("inter_chain", listOf(DEMO_INVALID_AD_UNIT, TEST_INTERSTITIAL))
                 // Yalnızca elle yüklenen placement örneği.
                 addPlacement("inter_level_end", TEST_INTERSTITIAL, preload = false)
+                // SplashActivity: tek kullanımlık; gösterimden sonra yeniden yüklenmez, hata olursa retry yok.
+                addPlacement("inter_splash", TEST_INTERSTITIAL, reloadAfterShow = false)
             }
 
             rewarded {
@@ -119,7 +122,7 @@ class DemoApp : Application() {
             application = this,
             placementId = "appopen_default",     // (varsayılan: null = default placement)
             showOnColdStart = false,             // (varsayılan: false)
-            excludedActivities = emptySet(),     // örn. setOf(SplashActivity::class.java)
+            excludedActivities = setOf(SplashActivity::class.java), // splash'in kendi reklamı var (varsayılan: boş)
             excludePredicate = null              // örn. ActivityPredicate { it is PurchaseActivity }
         )
     }
@@ -150,11 +153,12 @@ class DemoApp : Application() {
                 "enabled": true,
                 "preload": true,
                 "defaultPlacement": "inter_default",
-                "initialPreloadPlacements": ["inter_default"],
+                "initialPreloadPlacements": ["inter_default", "inter_chain", "inter_splash"],
                 "placements": {
                   "inter_default": { "adUnit": "$TEST_INTERSTITIAL", "enabled": true, "preload": true, "reloadAfterShow": true },
                   "inter_chain": { "adUnit": ["$DEMO_INVALID_AD_UNIT", "$TEST_INTERSTITIAL"] },
-                  "inter_level_end": { "adUnit": "$TEST_INTERSTITIAL", "preload": false }
+                  "inter_level_end": { "adUnit": "$TEST_INTERSTITIAL", "preload": false },
+                  "inter_splash": { "adUnit": "$TEST_INTERSTITIAL", "reloadAfterShow": false }
                 }
               },
               "rewarded": {
