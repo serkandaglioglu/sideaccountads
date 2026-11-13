@@ -56,7 +56,8 @@ object SideAds {
 
     /**
      * Kütüphaneyi başlatır; `Application.onCreate` içinde çağrılır. SDK arka planda başlar; yükleme istekleri init
-     * bitene kadar kuyrukta bekler. `umpConsentEnabled` ise ve consent yoksa SDK [ConsentFlow.request] sonrası başlar.
+     * bitene kadar kuyrukta bekler. `umpConsentEnabled` ise SDK [ConsentFlow.request] ile başlar: kayıtlı consent
+     * varsa çağrıldığı anda, yoksa form cevaplanınca.
      *
      * @param onReady SDK hazır olunca (ya da 20 sn dolunca) bir kez çağrılır; reklamlar kapalıysa hemen.
      */
@@ -278,8 +279,9 @@ class BannerAds internal constructor() {
 class ConsentFlow internal constructor() {
 
     /**
-     * Consent bilgisini günceller, gerekiyorsa formu gösterir; bitince (consent varsa) SDK'yı başlatır. İlk activity'de
-     * (ör. splash) her açılışta çağrılması önerilir; form yalnızca gerektiğinde görünür.
+     * Consent bilgisini günceller, gerekiyorsa formu gösterir. Kayıtlı consent varsa SDK'yı çağrıldığı anda (ağ isteğini
+     * ve [callback]'i beklemeden), yoksa form cevaplanınca başlatır. İlk activity'de (ör. splash) her açılışta
+     * çağrılması önerilir; form yalnızca gerektiğinde görünür.
      */
     @JvmOverloads
     fun request(activity: Activity, callback: ConsentCallback? = null) = Engine.requestConsent(activity, callback)

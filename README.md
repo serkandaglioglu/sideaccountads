@@ -104,7 +104,9 @@ Java'dan aynı ayar `new SideAdsSettings.Builder()` ile kurulur.
 - SDK arka planda başlar. Init bitene kadar yükleme istekleri kuyrukta bekler, init bitince bir kez çalışır
   (Google: mediation'da adaptörler hazır olsun diye init tamamlanmadan reklam yüklenmemeli).
 - Init 20 sn içinde bitmezse uyarı loglanır ve bekleyen istekler yine çalışır.
-- `umpConsentEnabled = true` ise ve kayıtlı consent yoksa SDK, consent alınana kadar başlamaz.
+- `umpConsentEnabled = true` ise SDK `SideAds.consent.request()` ile başlar: kayıtlı consent varsa çağrıldığı anda
+  (ağ isteği ve form beklenmez), yoksa form cevaplanınca. UMP kayıtlı consent'i ancak bu çağrıdan sonra bildirdiği
+  için init tek başına başlatamaz.
 
 ### Tüm ayarlar ve varsayılanları
 
@@ -137,7 +139,7 @@ Placement: ad unit (tekil ya da sıralı liste), `enabled` (true), `preload` (tr
 
 ```kotlin
 SideAds.consent.request(this) { canRequestAds ->
-    // Form gerekiyorsa gösterildi ve kapandı; consent varsa SDK başladı, preload'lar kuyruğa girdi.
+    // Form gerekiyorsa gösterildi ve kapandı; consent varsa SDK başladı (kayıtlı consent'le bu callback'ten önce).
 }
 ```
 

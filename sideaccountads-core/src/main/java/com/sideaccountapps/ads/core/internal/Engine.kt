@@ -114,7 +114,8 @@ internal object Engine {
             return
         }
         if (s.umpConsentEnabled && !UmpConsent.canRequestAds(ctx)) {
-            Logger.i("UMP consent required; waiting for SideAds.consent.request() before starting the ad SDK")
+            // UMP, süreçte requestConsentInfoUpdate çağrılana kadar kayıtlı consent'i de bildirmez.
+            Logger.i("UMP consent not confirmed yet; the ad SDK starts once SideAds.consent.request() confirms it")
             return
         }
         sdkStarted = true
@@ -165,6 +166,8 @@ internal object Engine {
                 callback?.onComplete(canRequestAds)
             }
         }
+        // Önceki oturumun consent'i artık canRequestAds'e yansıdı: ağ isteğini ve formu beklemeden başla (Google UMP örneği).
+        startSdkIfAllowed()
     }
 
     fun openDebugger(activity: Activity) {

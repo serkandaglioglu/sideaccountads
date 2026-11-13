@@ -66,7 +66,10 @@ internal object UmpConsent {
         false
     }
 
-    /** Consent bilgisini günceller, gerekiyorsa formu gösterir; sonunda (hata olsa da) [onComplete] çağrılır. */
+    /**
+     * Consent bilgisini günceller, gerekiyorsa formu gösterir; sonunda (hata olsa da) [onComplete] çağrılır.
+     * `requestConsentInfoUpdate` senkron çağrılır: dönüşte [canRequestAds] önceki oturumun consent'ini yansıtır.
+     */
     fun gather(activity: Activity, testMode: Boolean, testDeviceHashedIds: List<String>, onComplete: (Boolean) -> Unit) {
         val params = ConsentRequestParameters.Builder()
         if (testMode && testDeviceHashedIds.isNotEmpty()) {
